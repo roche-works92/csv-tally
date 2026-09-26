@@ -59,6 +59,17 @@ This also means it composes with other tools:
 $ grep 2024 orders.csv | csvtally status -
 ```
 
+Comma-separate column names to tally a compound key across several columns
+at once:
+
+```
+$ csvtally status,region orders.csv
+2	shipped	us
+1	pending	eu
+1	shipped	us
+1	cancelled, refunded	us
+```
+
 ## Options
 
 ```
@@ -67,6 +78,7 @@ csvtally COLUMN [FILE] [-d DELIMITER] [--no-header] [--sort {count,value}]
 ```
 
 - `COLUMN` - column name, or a 0-based index when used with `--no-header`.
+  Comma-separate several to tally them together as a compound key.
 - `FILE` - path to a CSV file. Omit, or pass `-`, to read from stdin.
 - `-d, --delimiter` - field delimiter, default `,`.
 - `--no-header` - treat the first row as data instead of column names.
@@ -75,4 +87,5 @@ csvtally COLUMN [FILE] [-d DELIMITER] [--no-header] [--sort {count,value}]
 - `--ascending` - reverse the default descending sort.
 - `-n, --limit N` - show only the top N rows.
 
-Output is `count<TAB>value`, one line per distinct value, to stdout.
+Output is `count<TAB>value`, one line per distinct value, to stdout. With a
+compound key, each column's value gets its own tab-separated field.

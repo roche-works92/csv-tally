@@ -5,7 +5,7 @@ import unittest
 from contextlib import redirect_stderr, redirect_stdout
 from unittest import mock
 
-from csvtally.cli import main, resolve_column, tally
+from csvtally.cli import main, resolve_column, resolve_columns, tally
 
 
 class FakeStdin:
@@ -34,12 +34,33 @@ class ResolveColumnTests(unittest.TestCase):
             resolve_column([], "status", False)
 
 
+class ResolveColumnsTests(unittest.TestCase):
+    def test_single_column(self):
+        self.assertEqual(resolve_columns(["id", "status"], "status", True), [1])
+
+    def test_compound_key(self):
+        self.assertEqual(
+            resolve_columns(["id", "status", "region"], "status,region", True), [1, 2]
+        )
+
+    def test_compound_key_no_header(self):
+        self.assertEqual(resolve_columns([], "0,2", False), [0, 2])
+
+
 class TallyTests(unittest.TestCase):
     def test_counts_and_skips_short_rows(self):
         rows = [["a"], ["b", "x"], ["b", "x"], ["c"]]
-        counts, skipped = tally(rows, 1)
-        self.assertEqual(counts, {"x": 2})
+        counts, skipped = tally(rows, [1])
+        self.assertEqual(counts, {("x",): 2})
         self.assertEqual(skipped, 2)
+
+    def test_compound_key(self):
+        rows = [["a", "us"], ["a", "us"], ["a", "eu"], ["b", "us"]]
+        counts, skipped = tally(rows, [0, 1])
+        self.assertEqual(
+            counts, {("a", "us"): 2, ("a", "eu"): 1, ("b", "us"): 1}
+        )
+        self.assertEqual(skipped, 0)
 
 
 class MainEndToEndTests(unittest.TestCase):
@@ -98,6 +119,21 @@ class MainEndToEndTests(unittest.TestCase):
         code, out = self._run_with_file(content, ["1", "--no-header"])
         self.assertEqual(code, 0)
         self.assertIn("2\t2", out)
+
+    def test_compound_key_columns(self):
+        content = (
+            "id,status,region\n"
+            "1,shipped,us\n"
+            "2,shipped,us\n"
+            "3,shipped,eu\n"
+            "4,pending,us\n"
+        )
+        code, out = self._run_with_file(content, ["status,region"])
+        self.assertEqual(code, 0)
+        lines = out.splitlines()
+        self.assertIn("2\tshipped\tus", lines)
+        self.assertIn("1\tshipped\teu", lines)
+        self.assertIn("1\tpending\tus", lines)
 
     def test_custom_delimiter(self):
         content = "k|v\nx|1\nx|1\ny|2\n"

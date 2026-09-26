@@ -34,14 +34,19 @@ def resolve_column(header, column_arg, has_header):
         )
 
 
-def tally(rows, index):
+def resolve_columns(header, column_arg, has_header):
+    # a comma-separated column_arg tallies a compound key, e.g. "status,region"
+    return [resolve_column(header, part, has_header) for part in column_arg.split(",")]
+
+
+def tally(rows, indices):
     counts = Counter()
     skipped = 0
     for row in rows:
-        if index >= len(row):
+        if any(i >= len(row) for i in indices):
             skipped += 1
             continue
-        counts[row[index]] += 1
+        counts[tuple(row[i] for i in indices)] += 1
     return counts, skipped
 
 
@@ -63,7 +68,8 @@ def parse_args(argv):
     )
     parser.add_argument(
         "column",
-        help="column name (or 0-based index with --no-header) to tally",
+        help="column name (or 0-based index with --no-header) to tally; "
+        "comma-separate multiple columns to tally them as a compound key",
     )
     parser.add_argument(
         "file",
@@ -111,15 +117,15 @@ def main(argv=None):
         else:
             header = []
 
-        index = resolve_column(header, args.column, not args.no_header)
-        counts, skipped = tally(rows, index)
+        indices = resolve_columns(header, args.column, not args.no_header)
+        counts, skipped = tally(rows, indices)
 
     if not counts:
         print("no data rows found", file=sys.stderr)
         return 1
 
-    for value, count in format_table(counts, args.sort, args.ascending, args.limit):
-        print(f"{count}\t{value}")
+    for key, count in format_table(counts, args.sort, args.ascending, args.limit):
+        print(f"{count}\t" + "\t".join(key))
 
     if skipped:
         print(f"skipped {skipped} row(s) missing that column", file=sys.stderr)
